@@ -1,10 +1,7 @@
 package rin.crecovery;
 
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -13,22 +10,14 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
-import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.Spinner;
-import android.widget.TextView;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 
 public class MainActivity extends AppCompatActivity implements FragmentInteractionListener,
@@ -36,6 +25,8 @@ public class MainActivity extends AppCompatActivity implements FragmentInteracti
         StopwatchFragment.StopwatchFragInteractionListener {
 
     private ActivityInteractionListener mListener;
+
+    private FloatingActionButton fab;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,16 +56,36 @@ public class MainActivity extends AppCompatActivity implements FragmentInteracti
                 if (fragment instanceof ActivityInteractionListener) {
                     mListener = (ActivityInteractionListener) fragment;
                 }
+
+                if (fragment instanceof MainFragment)
+                    onChangeFabIcon(R.drawable.ic_done_all_white);
+                else if (fragment instanceof NotesFragment)
+                    onChangeFabIcon(R.drawable.ic_save_white_24dp);
+                else if (fragment instanceof  StopwatchFragment)
+                    onChangeFabIcon(R.drawable.ic_timer_white_24dp);
             }
         });
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+        fab = (FloatingActionButton) findViewById(R.id.fab);
+
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 if (mListener != null) {
                     mListener.onButtonPressed();
                 }
+            }
+        });
+
+        fab.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                if (mListener != null) {
+                    mListener.onLongButtonPressed();
+                    return true;
+                }
+
+                return false;
             }
         });
 
@@ -109,16 +120,17 @@ public class MainActivity extends AppCompatActivity implements FragmentInteracti
                 Intent i = new Intent(this, HelpActivity.class);
                 startActivity(i);
                 return true;
-            case R.id.action_settings:
-                return true;
         }
 
         return super.onOptionsItemSelected(item);
     }
 
     private void setupViewPager(ViewPager viewPager) {
+        MainFragment mainFragment = MainFragment.newInstance();
+        mListener = mainFragment;
+
         ViewPagerAdapter adapter = new ViewPagerAdapter(getSupportFragmentManager());
-        adapter.addFragment(MainFragment.newInstance(), getString(R.string.tab_one));
+        adapter.addFragment(mainFragment, getString(R.string.tab_one));
         adapter.addFragment(NotesFragment.newInstance(), getString(R.string.tab_two));
         adapter.addFragment(StopwatchFragment.newInstance(), getString(R.string.tab_three));
         viewPager.setAdapter(adapter);
@@ -128,6 +140,11 @@ public class MainActivity extends AppCompatActivity implements FragmentInteracti
     public void onCreateSnackbar(View view, String msg) {
         Snackbar.make(view, msg, Snackbar.LENGTH_LONG)
                 .show();
+    }
+
+    public void onChangeFabIcon(int resource) {
+        if (fab != null)
+            fab.setImageDrawable(getResources().getDrawable(resource, null));
     }
 
     /*private void ledOff() {

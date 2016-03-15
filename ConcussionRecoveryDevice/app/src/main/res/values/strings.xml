@@ -12,8 +12,6 @@
     <string name="tab_one">INFO</string>
     <string name="tab_two">NOTES</string>
     <string name="tab_three">STOPWATCH</string>
-
-    <!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="watch">0:00</string>
 
 </resources>

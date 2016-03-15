@@ -20,6 +20,7 @@ import android.widget.TextView;
  */
 public class StopwatchFragment extends Fragment implements ActivityInteractionListener {
 
+    private FragmentInteractionListener mFragListener;
     private StopwatchFragInteractionListener mListener;
 
     private TextView watch;
@@ -28,6 +29,10 @@ public class StopwatchFragment extends Fragment implements ActivityInteractionLi
     private Runnable runnable;
 
     private boolean isStopwatchStarted = false;
+    private long startTime = 0L;
+    private long delta = 0L;
+    private long updatedTime = 0L;
+    private long timeMsec = 0L;
     private int minute = 0;
     private int seconds = 0;
 
@@ -65,16 +70,17 @@ public class StopwatchFragment extends Fragment implements ActivityInteractionLi
         runnable = new Runnable() {
             @Override
             public void run() {
-                if (seconds == 60) {
-                    seconds = 0;
-                    minute += 1;
-                } else {
-                    seconds += 1;
-                }
+                timeMsec = System.currentTimeMillis() - startTime;
+                updatedTime = delta + timeMsec;
+
+                seconds = (int) (updatedTime / 1000);
+                minute = seconds / 60;
+                seconds = seconds % 60;
 
                 String time = String.valueOf(minute) + ":"
-                        + String.valueOf(seconds);
+                        + String.format("%02d", seconds);
                 watch.setText(time);
+                handler.postDelayed(this, 0);
             }
         };
 
@@ -84,11 +90,28 @@ public class StopwatchFragment extends Fragment implements ActivityInteractionLi
     @Override
     public void onButtonPressed() {
         if (isStopwatchStarted) {
+            delta += timeMsec;
             handler.removeCallbacks(runnable);
+            isStopwatchStarted = false;
         } else {
-            handler.postDelayed(runnable, 1000L);
+            startTime = System.currentTimeMillis();
+            handler.postDelayed(runnable, 0);
             isStopwatchStarted = true;
         }
+    }
+
+    @Override
+    public void onLongButtonPressed() {
+        startTime = 0;
+        delta = 0;
+        timeMsec = 0;
+
+        seconds = 0;
+        minute = 0;
+        watch.setText(getString(R.string.watch));
+
+        handler.removeCallbacks(runnable);
+        isStopwatchStarted = false;
     }
 
     @Override
@@ -99,7 +122,9 @@ public class StopwatchFragment extends Fragment implements ActivityInteractionLi
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        if (context instanceof StopwatchFragInteractionListener) {
+        if (context instanceof StopwatchFragInteractionListener &&
+                context instanceof FragmentInteractionListener) {
+            mFragListener = (FragmentInteractionListener) context;
             mListener = (StopwatchFragInteractionListener) context;
         } else {
             throw new RuntimeException(context.toString()

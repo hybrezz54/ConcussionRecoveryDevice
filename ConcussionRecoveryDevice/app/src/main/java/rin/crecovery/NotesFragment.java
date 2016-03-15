@@ -69,6 +69,10 @@ public class NotesFragment extends Fragment implements ActivityInteractionListen
     }
 
     @Override
+    public void onLongButtonPressed() {
+    }
+
+    @Override
     public void onAttach(Context context) {
         super.onAttach(context);
         if (context instanceof NotesFragInteractionListener &&

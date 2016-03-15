@@ -112,6 +112,10 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
     }
 
     @Override
+    public void onLongButtonPressed() {
+    }
+
+    @Override
     public void onAttach(Context context) {
         super.onAttach(context);
         if (context instanceof MainFragInteractionListener &&
@@ -174,18 +178,24 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
     public boolean bluetooth() {
         btAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        if (btAdapter != null && !btAdapter.isEnabled()) {
-            // ask user to turn bluetooth on
-            Intent i = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(i, 1);
+        if (btAdapter != null) {
+            if (btAdapter.isEnabled()) {
+                mFragListener.onCreateSnackbar(ptAge, "Bluetooth already enabled.");
+            } else {
+                // ask user to turn bluetooth on
+                Intent i = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                startActivityForResult(i, 1);
+            }
         } else {
             mFragListener.onCreateSnackbar(ptAge, "Bluetooth not available.");
             return false;
         }
 
+        if (!btAdapter.isDiscovering())
+            btAdapter.startDiscovery();
+
         Set<BluetoothDevice> pairedDevices = btAdapter.getBondedDevices();
         ArrayList list = new ArrayList();
-        list.add("--- CHOOSE A DEVICE ---");
 
         if (pairedDevices.size() > 0) {
             for (BluetoothDevice bt : pairedDevices) {
@@ -195,33 +205,11 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
             return false;
         }
 
-        LayoutInflater inflater = LayoutInflater.from(getContext());
-        View dlgView = inflater.inflate(R.layout.layout_bt_dlg, null);
+        // Get the device MAC address, the last 17 chars in the View
+        String info = ((TextView) view).getText().toString();
+        String address = info.substring(info.length() - 17);
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext(), R.style.AlertDlgStyle)
-                .setTitle("Choose the Blutooth Device")
-                .setView(dlgView)
-                .setNegativeButton("Cancel", null);
-
-        AlertDialog dialog = builder.create();
-        Spinner spinner = (Spinner) dlgView.findViewById(R.id.btSpinner);
-        final ArrayAdapter adapter = new ArrayAdapter(getContext(), android.R.layout.simple_list_item_1,
-                list);
-        spinner.setAdapter(adapter);
-
-        spinner.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                // Get the device MAC address, the last 17 chars in the View
-                String info = ((TextView) view).getText().toString();
-                String address = info.substring(info.length() - 17);
-
-                new ConnectBluetooth(address).execute("");
-            }
-        });
-
-        dialog.show();
-        dialog.setCanceledOnTouchOutside(true);
+        new ConnectBluetooth(address).execute("");
 
         return true;
     }
@@ -271,7 +259,6 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
                     btAdapter = BluetoothAdapter.getDefaultAdapter();
                     BluetoothDevice device = btAdapter.getRemoteDevice(address);
                     btSocket = device.createInsecureRfcommSocketToServiceRecord(uuid);
-                    btAdapter.getDefaultAdapter();
                     btSocket.connect(); // start connection
                 }
             } catch (IOException e) {
