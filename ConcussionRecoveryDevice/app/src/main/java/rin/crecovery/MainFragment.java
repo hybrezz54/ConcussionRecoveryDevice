@@ -3,25 +3,23 @@ package rin.crecovery;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
-import android.support.v7.app.AlertDialog;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
-import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 
 /**
@@ -34,21 +32,27 @@ import java.util.UUID;
  */
 public class MainFragment extends Fragment implements ActivityInteractionListener {
 
+    // Message types used by the Handler
+    public static final int MESSAGE_WRITE = 1;
+    public static final int MESSAGE_READ = 2;
+
     private final static int TMHR_NUM = 220;
+    private double hr = 0;
 
     private BluetoothAdapter btAdapter = null;
-    private BluetoothSocket btSocket = null;
-    private boolean isBtConnected = false;
-    private static final UUID uuid = UUID.fromString("7499f0e0-de32-11e5-b86d-9a79f06e9478");
+    private BtSendReceive mBtData;
 
     private EditText ptAge;
     private EditText minPercent;
     private EditText maxPercent;
     private TextView output1;
     private TextView output2;
+    private TextView bpm;
 
     private FragmentInteractionListener mFragListener;
     private MainFragInteractionListener mListener;
+
+    private BtDiscoveryReceiver receiver;
 
     public MainFragment() {
         // Required empty public constructor
@@ -72,6 +76,14 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+
+        receiver = new BtDiscoveryReceiver();
+        getContext().registerReceiver(receiver,
+                filter);
+
         /*if (getArguments() != null) {
             mParam1 = getArguments().getString(ARG_PARAM1);
         }*/
@@ -89,6 +101,7 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
         maxPercent = (EditText) view.findViewById(R.id.maxPercentage);
         output1 = (TextView) view.findViewById(R.id.txtOutput1);
         output2 = (TextView) view.findViewById(R.id.txtOutput2);
+        bpm = (TextView) view.findViewById(R.id.bpm);
 
         return view;
     }
@@ -99,15 +112,34 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
         output1.setText("Lowest Heart Rate/minute: " + Double.toString(hrpm[0]));
         output2.setText("Highest Heart Rate/minute: " + Double.toString(hrpm[1]));
 
-        /*double hr = getHeartRate();
-        if (hr != 0) {
-            if (hr <= hrpm[0] || hr >= hrpm[1])
-                ledOn();
-            else
-                ledOff();
-        }*/
+        if (mBtData != null) {
+            try {
+                Runnable r =  new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            hr = BtSendReceive.toDouble(mBtData.read());
+                            String beats = hr + " BPM";
+                            bpm.setText(beats);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        } catch (ExecutionException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                };
+                new Thread(r).start();
 
-        sendData(Double.toString(hrpm[0]), Double.toString(hrpm[1]));
+                if (hr != 0) {
+                    if (hr <= hrpm[0] || hr >= hrpm[1])
+                        mBtData.send("on");
+                    else
+                        mBtData.send("off");
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
 
     }
 
@@ -129,25 +161,17 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
     }
 
     @Override
+    public void onDestroy() {
+        super.onDestroy();
+        getContext().unregisterReceiver(receiver);
+    }
+
+    @Override
     public void onDetach() {
         super.onDetach();
         mFragListener = null;
         mListener = null;
     }
-
-    /*private double getHeartRate(BluetoothSocket socket) {
-        double hr = 0;
-
-        if (socket != null) {
-            try {
-                hr = socket.getInputStream().read();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-        return hr;
-    }*/
 
     private double[] calculate() {
         double[] hrpm = new double[2];
@@ -179,9 +203,7 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
         btAdapter = BluetoothAdapter.getDefaultAdapter();
 
         if (btAdapter != null) {
-            if (btAdapter.isEnabled()) {
-                mFragListener.onCreateSnackbar(ptAge, "Bluetooth already enabled.");
-            } else {
+            if (!btAdapter.isEnabled()) {
                 // ask user to turn bluetooth on
                 Intent i = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
                 startActivityForResult(i, 1);
@@ -194,52 +216,17 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
         if (!btAdapter.isDiscovering())
             btAdapter.startDiscovery();
 
-        Set<BluetoothDevice> pairedDevices = btAdapter.getBondedDevices();
-        ArrayList list = new ArrayList();
-
-        if (pairedDevices.size() > 0) {
-            for (BluetoothDevice bt : pairedDevices) {
-                list.add(bt.getName() + "\n" + bt.getAddress());
-            }
-        } else {
-            return false;
-        }
-
-        // Get the device MAC address, the last 17 chars in the View
-        String info = ((TextView) view).getText().toString();
-        String address = info.substring(info.length() - 17);
-
-        new ConnectBluetooth(address).execute("");
-
         return true;
     }
 
-    private void disconnectBt() {
-        if (btSocket != null) {
-            try {
-                btSocket.close();
-            } catch (IOException e) {
-                mFragListener.onCreateSnackbar(ptAge, "Error disconnecting device.");
-                e.printStackTrace();
-            }
-        }
-    }
+    public class ConnectBluetooth extends AsyncTask {
 
-    private void sendData(String... data) {
-        if (btSocket != null) {
-            try {
-                for (String d : data) {
-                    btSocket.getOutputStream().write(d.getBytes());
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    private class ConnectBluetooth extends AsyncTask {
+        private final UUID uuid = UUID.fromString("7499f0e0-de32-11e5-b86d-9a79f06e9478");
+        private boolean isBtConnected = false;
 
         private boolean successConnect = true; //if here, it's almost connected
+
+        private BluetoothSocket btSocket = null;
 
         private String address;
 
@@ -254,16 +241,29 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
 
         @Override
         protected Object doInBackground(Object[] params) {
+            btAdapter = BluetoothAdapter.getDefaultAdapter();
+            BluetoothDevice device = btAdapter.getRemoteDevice(address);
+
             try {
                 if (btSocket == null || !isBtConnected) {
-                    btAdapter = BluetoothAdapter.getDefaultAdapter();
-                    BluetoothDevice device = btAdapter.getRemoteDevice(address);
                     btSocket = device.createInsecureRfcommSocketToServiceRecord(uuid);
+                    btAdapter.cancelDiscovery();
+
+                    mBtData = new BtSendReceive(btSocket);
                     btSocket.connect(); // start connection
                 }
             } catch (IOException e) {
-                successConnect = false;
                 e.printStackTrace();
+
+                try {
+                    btSocket = (BluetoothSocket) device.getClass()
+                            .getMethod("createRfcommSocket", new Class[] {int.class})
+                            .invoke(device, 1);
+                    btSocket.connect();
+                } catch (Exception e2) {
+                    successConnect = false;
+                    e2.printStackTrace();
+                }
             }
 
             return null;
@@ -283,6 +283,30 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
 
     }
 
+    public class BtDiscoveryReceiver extends BroadcastReceiver {
+
+        private ConnectBluetooth connectBluetooth;
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            Log.e("BtDiscoveryReceiver", "Broadcast receiver");
+
+            if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                mFragListener.onCreateSnackbar(ptAge, "Found device.");
+
+                //if (discoveredDevice.equals("linvor")) {
+                connectBluetooth = new ConnectBluetooth(device.getAddress());
+                connectBluetooth.execute("");
+                //}
+            }
+        }
+
+    }
+
+
+
     /**
      * This interface must be implemented by activities that contain this
      * fragment to allow an interaction in this fragment to be communicated
@@ -290,6 +314,6 @@ public class MainFragment extends Fragment implements ActivityInteractionListene
      * activity.
      */
     public interface MainFragInteractionListener {
-
     }
+
 }

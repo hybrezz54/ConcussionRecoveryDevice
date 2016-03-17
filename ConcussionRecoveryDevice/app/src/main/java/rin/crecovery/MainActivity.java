@@ -1,5 +1,8 @@
 package rin.crecovery;
 
+import android.bluetooth.BluetoothDevice;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -144,7 +147,9 @@ public class MainActivity extends AppCompatActivity implements FragmentInteracti
 
     public void onChangeFabIcon(int resource) {
         if (fab != null)
-            fab.setImageDrawable(getResources().getDrawable(resource, null));
+            fab.setImageDrawable(getApplicationContext()
+                    .getResources()
+                    .getDrawable(resource));
     }
 
     /*private void ledOff() {

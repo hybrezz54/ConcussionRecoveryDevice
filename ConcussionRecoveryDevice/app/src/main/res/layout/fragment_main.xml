@@ -66,6 +66,15 @@
 
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/bpm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:layout_margin="4dp"
+            android:text="@string/bpm"
+            android:textSize="24sp" />
+
     </LinearLayout>
 
 </FrameLayout>
