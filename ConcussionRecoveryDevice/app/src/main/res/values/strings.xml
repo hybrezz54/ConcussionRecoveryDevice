@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Concussion Recovery Device</string>
+    <string name="action_settings">Settings</string>
+    <string name="title_activity_help">HelpActivity</string>
+    <string name="title_activity_intro">IntroActivity</string>
+
+    <string name="action_bluetooth">BT</string>
+    <string name="action_ledon">Turn LED On</string>
+    <string name="action_ledoff">Turn LED Off</string>
+    <string name="action_help">Help...</string>
+
+    <string name="tab_one">INFO</string>
+    <string name="tab_two">NOTES</string>
+    <string name="tab_three">STOPWATCH</string>
+    <string name="watch">0:00</string>
+
+</resources>
